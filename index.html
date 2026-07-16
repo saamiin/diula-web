@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DiuLa! 失物比對</title>
+  <style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background:#F5F0E8; font-family:sans-serif; max-width:390px; margin:0 auto; color:#4A3728; }
+
+  .header { display:flex; align-items:center; padding:18px 20px 10px; gap:12px; }
+  .back { font-size:24px; cursor:pointer; }
+  .header h1 { font-size:18px; }
+
+  /* 搜尋表單 */
+  .search { padding:0 16px 12px; display:flex; flex-direction:column; gap:8px; }
+  .search .row { display:flex; gap:8px; }
+  .search label { font-size:12px; color:#6B5744; display:block; margin-bottom:2px; }
+  .search select, .search input {
+    width:100%; padding:8px 10px; border:1px solid #D8CCBE; border-radius:10px;
+    background:white; color:#4A3728; font-size:13px; font-family:inherit;
+  }
+  .search .col { flex:1; }
+  .btn {
+    background:#4A3728; color:white; border:none; border-radius:12px;
+    padding:11px; font-size:14px; font-weight:bold; cursor:pointer; margin-top:2px;
+  }
+  .btn:active { opacity:.85; }
+
+  .tab-bar { display:flex; gap:8px; padding:4px 16px 12px; }
+  .tab { padding:6px 14px; border-radius:20px; border:1.5px solid #4A3728;
+    background:white; color:#4A3728; font-size:13px; cursor:pointer; }
+  .tab.active { background:#4A3728; color:white; }
+
+  .status { padding:0 20px 8px; font-size:12px; color:#6B5744; }
+
+  .card-list { padding:0 16px 24px; display:flex; flex-direction:column; gap:12px; }
+  .card { display:flex; gap:12px; background:#D6E0EB; border-radius:14px; padding:14px; cursor:pointer; }
+  .card:active { opacity:.9; }
+  .score-badge {
+    width:52px; height:52px; border-radius:12px; flex-shrink:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    color:white; font-weight:bold;
+  }
+  .score-badge .n { font-size:17px; line-height:1; }
+  .score-badge .l { font-size:9px; opacity:.9; margin-top:2px; }
+  .card-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .card-title { font-size:14px; font-weight:bold; }
+  .card-sub { font-size:11px; color:#6B5744; }
+  .src-pill { display:inline-block; font-size:10px; background:#4A3728; color:white;
+    border-radius:8px; padding:1px 7px; margin-bottom:2px; align-self:flex-start; }
+
+  /* 詳細頁 */
+  .detail-page { position:fixed; top:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:390px; height:100%; background:#F5F0E8; overflow-y:auto; display:none; }
+  .detail-body { padding:8px 20px 40px; display:flex; flex-direction:column; gap:14px; }
+  .detail-card { background:white; border-radius:14px; padding:16px; display:flex; flex-direction:column; gap:10px; }
+  .detail-row { display:flex; gap:10px; font-size:14px; }
+  .detail-row .k { color:#8A7A66; white-space:nowrap; }
+  .section-title { font-size:13px; font-weight:bold; }
+  .tag-list { display:flex; flex-wrap:wrap; gap:8px; }
+  .tag { background:#E8E0D8; padding:4px 12px; border-radius:20px; font-size:12px; }
+  /* 分數細項 */
+  .bd-row { display:flex; align-items:center; gap:8px; font-size:12px; }
+  .bd-row .k { width:52px; color:#8A7A66; }
+  .bar { flex:1; height:8px; background:#EDE6DC; border-radius:4px; overflow:hidden; }
+  .bar > i { display:block; height:100%; background:#4A3728; }
+  .bd-row .v { width:34px; text-align:right; }
+  .npa-btn { display:block; text-align:center; background:#D6E0EB; color:#4A3728;
+    padding:14px; border-radius:14px; text-decoration:none; font-size:14px; font-weight:bold; }
+  </style>
+</head>
+<body>
+
+  <!-- 列表頁 -->
+  <div id="list-page">
+    <div class="header"><span class="back" onclick="history.back()">‹</span><h1>失物比對</h1></div>
+
+    <div class="search">
+      <div>
+        <label>物品分類</label>
+        <select id="f-category"></select>
+      </div>
+      <div class="row">
+        <div class="col"><label>遺失日期</label><input type="date" id="f-date"></div>
+        <div class="col"><label>顏色（選填）</label><select id="f-color"></select></div>
+      </div>
+      <div class="row">
+        <div class="col"><label>縣市（選填）</label><input type="text" id="f-city" placeholder="如 台北市"></div>
+        <div class="col"><label>行政區（選填）</label><input type="text" id="f-district" placeholder="如 士林區"></div>
+      </div>
+      <button class="btn" onclick="doSearch()">比對</button>
+    </div>
+
+    <div class="tab-bar" id="tab-bar">
+      <button class="tab active" data-src="all">全部</button>
+      <button class="tab" data-src="npa">警政署</button>
+      <button class="tab" data-src="metro">北捷</button>
+      <button class="tab" data-src="hsr">高鐵</button>
+    </div>
+
+    <div class="status" id="status"></div>
+    <div class="card-list" id="card-list"></div>
+  </div>
+
+  <!-- 詳細頁 -->
+  <div class="detail-page" id="detail-page">
+    <div class="header"><span class="back" onclick="closeDetail()">‹</span><h1 id="d-title"></h1></div>
+    <div class="detail-body">
+      <div class="detail-card">
+        <div class="detail-row"><span class="k">分數</span><span id="d-score"></span></div>
+        <div class="detail-row"><span class="k">分類</span><span id="d-cat"></span></div>
+        <div class="detail-row"><span class="k">拾獲日</span><span id="d-date"></span></div>
+        <div class="detail-row"><span class="k">地點</span><span id="d-loc"></span></div>
+        <div class="detail-row"><span class="k">保管地</span><span id="d-hold"></span></div>
+        <div class="detail-row"><span class="k">來源</span><span id="d-src"></span></div>
+        <div class="detail-row" id="d-desc-row"><span class="k">說明</span><span id="d-desc"></span></div>
+      </div>
+      <div class="detail-card">
+        <div class="section-title">標籤</div>
+        <div class="tag-list" id="d-tags"></div>
+      </div>
+      <div class="detail-card">
+        <div class="section-title">分數細項</div>
+        <div id="d-breakdown"></div>
+      </div>
+      <a href="https://op2.npa.gov.tw/NM107-512Client/OP01A01Q_01.jsp" target="_blank" class="npa-btn">
+        前往警政署拾得遺失物系統
+      </a>
+    </div>
+  </div>
+
+<script>
+  // ---- API 位址 ----
+  // 同一份檔案要能在本機（file:// 或 localhost）和 GitHub Pages 兩邊用，所以自動判斷：
+  // 從本機開 → 打本機 Flask（python flask_app.py）；從 Pages 開 → 打 Render 上的後端。
+  // 後端網址換了只要改 CLOUD_API 這一行。
+  const CLOUD_API = "https://diula-api.onrender.com";
+  const API = ["localhost", "127.0.0.1", ""].includes(location.hostname)
+    ? "http://localhost:5001"
+    : CLOUD_API;
+
+  const COLORS = ['','黑','白','灰','銀','紅','橘','黃','綠','藍','紫','粉','棕','金','透明','多色'];
+  const SRC_NAME = { npa:'警政署', metro:'北捷', hsr:'高鐵', diula:'Diula!' };
+
+  let catName = {};        // id -> 分類名
+  let lastResults = [];    // 上次比對結果（給 tab 過濾與詳細頁用）
+  let curSrc = 'all';
+  const statusEl = document.getElementById("status");
+
+  // ---- 顏色依分數給底色 ----
+  function scoreColor(s){ if(s>=0.75) return '#3E7C4F'; if(s>=0.5) return '#B8860B'; return '#9A6A4A'; }
+
+  // ---- 載入分類下拉 ----
+  async function loadCategories(){
+    const cats = await (await fetch(API + "/categories")).json();
+    cats.forEach(c => catName[c.id] = c.name);
+    const sel = document.getElementById("f-category");
+    const tops = cats.filter(c => c.parent_id === null);
+    tops.forEach(top => {
+      const og = document.createElement("optgroup");
+      og.label = top.name;
+      // 大類本身也可查
+      og.appendChild(new Option(top.name + "（整類）", top.id));
+      cats.filter(c => c.parent_id === top.id).forEach(sub =>
+        og.appendChild(new Option("　" + sub.name, sub.id)));
+      sel.appendChild(og);
+    });
+    // 顏色下拉
+    const cs = document.getElementById("f-color");
+    COLORS.forEach(c => cs.appendChild(new Option(c || "不限", c)));
+  }
+
+  // ---- 送出比對 ----
+  async function doSearch(){
+    const body = {
+      category_id: parseInt(document.getElementById("f-category").value, 10),
+      lost_date: document.getElementById("f-date").value,
+      color: document.getElementById("f-color").value ? [document.getElementById("f-color").value] : [],
+      city: document.getElementById("f-city").value.trim() || null,
+      district: document.getElementById("f-district").value.trim() || null,
+      limit: 50
+    };
+    if (!body.category_id || !body.lost_date){ statusEl.textContent = "請選分類與遺失日期"; return; }
+    const btn = document.querySelector(".btn");
+    btn.disabled = true;                       // 防連點：一次比對就是一次 Firestore 配額
+    statusEl.textContent = "比對中…";
+    try {
+      const res = await fetch(API + "/match", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      lastResults = data.results;
+      curSrc = 'all';
+      document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', i===0));
+      render();
+    } catch (err){
+      statusEl.textContent = "比對失敗：" + err.message;
+      document.getElementById("card-list").innerHTML = "";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ---- 地點字串 ----
+  function locText(it){
+    return [it.city, it.district].filter(Boolean).join(" ")
+         || it.station || it.line || "—";
+  }
+  function itemName(it){
+    if (it.free_tags && it.free_tags.length) return it.free_tags[0];
+    return catName[it.category_id] || (it.description ? it.description.slice(0,12) : "未分類");
+  }
+
+  // ---- 渲染列表（含來源 tab 過濾）----
+  function render(){
+    const list = document.getElementById("card-list");
+    const rows = lastResults.filter(r => curSrc === 'all' || r.item.source === curSrc);
+    statusEl.textContent =
+      `共 ${lastResults.length} 筆候選` + (curSrc==='all' ? "" : `，${SRC_NAME[curSrc]} ${rows.length} 筆`);
+    list.innerHTML = "";
+    rows.forEach((r, idx) => {
+      const it = r.item, pct = Math.round(r.score * 100);
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <div class="score-badge" style="background:${scoreColor(r.score)}">
+          <span class="n">${pct}</span><span class="l">分</span>
+        </div>
+        <div class="card-body">
+          <span class="src-pill">${SRC_NAME[it.source] || it.source}</span>
+          <div class="card-title">${itemName(it)}　<span style="font-weight:normal;color:#6B5744;font-size:12px">${catName[it.category_id]||''}</span></div>
+          <div class="card-sub">📅 ${it.found_date || '—'}　📍 ${locText(it)}</div>
+          <div class="card-sub">🏛 ${it.holding_place || '—'}</div>
+        </div>`;
+      card.onclick = () => openDetail(r);
+      list.appendChild(card);
+    });
+    if (!rows.length) list.innerHTML = `<div class="status">此來源沒有符合的結果。</div>`;
+  }
+
+  // ---- 詳細頁 ----
+  function openDetail(r){
+    const it = r.item, b = r.breakdown || {};
+    document.getElementById("d-title").textContent = itemName(it);
+    document.getElementById("d-score").textContent = Math.round(r.score*100) + " 分";
+    document.getElementById("d-cat").textContent = catName[it.category_id] || "未分類";
+    document.getElementById("d-date").textContent = it.found_date || "—";
+    document.getElementById("d-loc").textContent = locText(it);
+    document.getElementById("d-hold").textContent = it.holding_place || "—";
+    document.getElementById("d-src").textContent = SRC_NAME[it.source] || it.source;
+    document.getElementById("d-desc-row").style.display = it.description ? "flex" : "none";
+    document.getElementById("d-desc").textContent = it.description || "";
+
+    const tags = [...(it.free_tags||[]), ...(it.color||[])];
+    document.getElementById("d-tags").innerHTML =
+      tags.length ? tags.map(t=>`<span class="tag">${t}</span>`).join("") : `<span class="card-sub">無</span>`;
+
+    const labels = {category:'分類',location:'地點',attr:'顏色',time:'時間',tags:'標籤'};
+    document.getElementById("d-breakdown").innerHTML = Object.keys(labels).map(k=>{
+      const v = b[k] ?? 0;
+      return `<div class="bd-row"><span class="k">${labels[k]}</span>
+        <span class="bar"><i style="width:${Math.round(v*100)}%"></i></span>
+        <span class="v">${v.toFixed(2)}</span></div>`;
+    }).join("");
+
+    document.getElementById("detail-page").style.display = "block";
+  }
+  function closeDetail(){ document.getElementById("detail-page").style.display = "none"; }
+
+  // ---- 來源 tab ----
+  document.getElementById("tab-bar").addEventListener("click", e => {
+    const t = e.target.closest(".tab"); if (!t) return;
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    t.classList.add("active"); curSrc = t.dataset.src; render();
+  });
+
+  // ---- 啟動 ----
+  // 只載入分類下拉（後端有快取，不燒讀取配額），不自動比對：
+  // 自動比對會讓「每個人打開網頁」「每次重新整理」都燒掉一次 Firestore 額度。
+  (async () => {
+    document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+    statusEl.textContent = "載入中…（雲端伺服器閒置後第一次喚醒約需 1 分鐘，請稍候）";
+    try {
+      await loadCategories();
+      statusEl.textContent = "填好上面的條件後按「比對」。";
+    } catch (err) {
+      statusEl.textContent = "分類載入失敗：" + err.message + "（伺服器可能還在喚醒，等一下重新整理）";
+    }
+  })();
+</script>
+</body>
+</html>
