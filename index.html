@@ -135,7 +135,7 @@
   // 同一份檔案要能在本機（file:// 或 localhost）和 GitHub Pages 兩邊用，所以自動判斷：
   // 從本機開 → 打本機 Flask（python flask_app.py）；從 Pages 開 → 打 Render 上的後端。
   // 後端網址換了只要改 CLOUD_API 這一行。
-  const CLOUD_API = "https://diula-api.onrender.com";
+  const CLOUD_API = "https://diula.onrender.com";
   const API = ["localhost", "127.0.0.1", ""].includes(location.hostname)
     ? "http://localhost:5001"
     : CLOUD_API;
