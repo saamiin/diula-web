@@ -82,7 +82,9 @@
         <select id="f-category"></select>
       </div>
       <div class="row">
-        <div class="col"><label>遺失日期</label><input type="date" id="f-date"></div>
+        <div class="col"><label>遺失日期</label><input type="date" id="f-date">
+          <div style="font-size:10px;color:#8A7A66;margin-top:3px;">失物登錄約有 2-3 天延遲</div>
+        </div>
         <div class="col"><label>顏色（選填）</label><select id="f-color"></select></div>
       </div>
       <div class="row">
@@ -280,7 +282,12 @@
   // 只載入分類下拉（後端有快取，不燒讀取配額），不自動比對：
   // 自動比對會讓「每個人打開網頁」「每次重新整理」都燒掉一次 Firestore 額度。
   (async () => {
-    document.getElementById("f-date").value = new Date().toISOString().slice(0, 10);
+    // 預設遺失日往前抓一週，不是今天。比對只收「拾獲日 >= 遺失日 - 2 天」的東西，
+    // 而各來源的失物登錄本來就有 2~3 天延遲（高鐵的公開資料尤其明顯）→ 填今天的話，
+    // 那個時間窗裡幾乎只剩北捷，看起來像「只查得到北捷」，其實是東西還沒被登錄。
+    const d = new Date();
+    d.setDate(d.getDate() - 7);
+    document.getElementById("f-date").value = d.toISOString().slice(0, 10);
     statusEl.textContent = "載入中…（雲端伺服器閒置後第一次喚醒約需 1 分鐘，請稍候）";
     try {
       await loadCategories();
