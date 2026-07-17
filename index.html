@@ -27,6 +27,26 @@
   }
   .btn:active { opacity:.85; }
 
+  /* AI 辨識區 */
+  .ai-box { margin:0 16px 12px; background:#EDE4D3; border-radius:14px; padding:12px 14px; }
+  .ai-title { font-size:13px; font-weight:bold; margin-bottom:8px; }
+  .ai-opt { font-size:11px; font-weight:normal; color:#8A7A66; margin-left:4px; }
+  .ai-row { display:flex; gap:8px; align-items:center; }
+  .ai-file { flex-shrink:0; background:white; border:1px solid #D8CCBE; border-radius:10px;
+    padding:8px 10px; font-size:13px; cursor:pointer; white-space:nowrap; }
+  .ai-file:active { opacity:.8; }
+  .ai-row input[type=text] { flex:1; min-width:0; padding:8px 10px; border:1px solid #D8CCBE;
+    border-radius:10px; background:white; color:#4A3728; font-size:13px; font-family:inherit; }
+  .ai-preview { display:none; max-height:120px; border-radius:10px; margin-top:8px; }
+  .btn-ai { background:#6B5744; margin-top:8px; width:100%; }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .ai-tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .ai-tag { background:#4A3728; color:white; border-radius:20px; padding:3px 10px; font-size:12px;
+    display:flex; align-items:center; gap:5px; }
+  .ai-tag .x { cursor:pointer; opacity:.7; font-weight:bold; }
+  .ai-tag .x:active { opacity:1; }
+  #cat-note { font-size:11px; color:#8A7A66; margin-left:6px; }
+
   .tab-bar { display:flex; gap:8px; padding:4px 16px 12px; }
   .tab { padding:6px 14px; border-radius:20px; border:1.5px solid #4A3728;
     background:white; color:#4A3728; font-size:13px; cursor:pointer; }
@@ -76,9 +96,25 @@
   <div id="list-page">
     <div class="header"><span class="back" onclick="history.back()">‹</span><h1>失物比對</h1></div>
 
+    <!-- AI 辨識：上傳照片或打字 → 產標籤 → 標籤直接拿去比對。
+         不想用 AI 的話可以完全略過這一區，改用下面的分類下拉手動選。 -->
+    <div class="ai-box">
+      <div class="ai-title">🤖 AI 辨識產生標籤<span class="ai-opt">（選用）</span></div>
+      <div class="ai-row">
+        <label class="ai-file">
+          📷 選照片
+          <input type="file" accept="image/*" id="f-photo" onchange="onPhoto(event)" hidden>
+        </label>
+        <input type="text" id="f-desc" placeholder="或直接描述，如：黑色折疊傘">
+      </div>
+      <img id="f-preview" class="ai-preview" alt="">
+      <button class="btn btn-ai" onclick="runAI()">開始 AI 辨識產生標籤</button>
+      <div class="ai-tags" id="f-tags"></div>
+    </div>
+
     <div class="search">
       <div>
-        <label>物品分類</label>
+        <label>物品分類<span id="cat-note"></span></label>
         <select id="f-category"></select>
       </div>
       <div class="row">
@@ -142,16 +178,81 @@
     ? "http://localhost:5001"
     : CLOUD_API;
 
+  // 畢制隊友（diula-inner）已經部署好的 Gemini 辨識 API。照片/文字 → 標籤。
+  // 回傳格式：{ items: [ { main_category:'雨具', sub_tag:'折傘', colors:['黑色'] } ] }
+  // 我們只要把 sub_tag + colors 攤平送給 /match，正規化（折傘→700、黑色→黑）由後端做。
+  const AI_API = "https://diula-backend-api.onrender.com/api/analyze-item";
+
   const COLORS = ['','黑','白','灰','銀','紅','橘','黃','綠','藍','紫','粉','棕','金','透明','多色'];
   const SRC_NAME = { npa:'警政署', metro:'北捷', hsr:'高鐵', diula:'Diula!' };
 
   let catName = {};        // id -> 分類名
   let lastResults = [];    // 上次比對結果（給 tab 過濾與詳細頁用）
+  let lastResolved = null; // 走 AI 標籤時，後端回報的解讀結果
   let curSrc = 'all';
   const statusEl = document.getElementById("status");
 
   // ---- 顏色依分數給底色 ----
   function scoreColor(s){ if(s>=0.75) return '#3E7C4F'; if(s>=0.5) return '#B8860B'; return '#9A6A4A'; }
+
+  // ================= AI 辨識產生標籤 =================
+  let aiTags = [];        // 有值時，比對會送 tags 而不是分類下拉的 category_id
+  let photoDataUrl = null;
+
+  function onPhoto(e){
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    // 隊友的 API 收的是完整 data URL（他那邊直接 imgEl.src = imgBase64），照同樣格式送。
+    reader.onload = ev => {
+      photoDataUrl = ev.target.result;
+      const img = document.getElementById("f-preview");
+      img.src = photoDataUrl;
+      img.style.display = "block";
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function renderTags(){
+    const box = document.getElementById("f-tags");
+    box.innerHTML = aiTags.map((t, i) =>
+      `<span class="ai-tag">${t}<span class="x" onclick="removeTag(${i})">×</span></span>`).join("");
+    // 標籤存在時，分類下拉就不會被用到（比對改送 tags），講清楚免得使用者以為下拉沒作用。
+    document.getElementById("cat-note").textContent =
+      aiTags.length ? "（已改用 AI 標籤，清空標籤才會用這個）" : "";
+  }
+  function removeTag(i){ aiTags.splice(i, 1); renderTags(); }
+
+  async function runAI(){
+    const desc = document.getElementById("f-desc").value.trim();
+    if (!photoDataUrl && !desc){ statusEl.textContent = "請先選一張照片，或打字描述你掉的東西。"; return; }
+    const btn = document.querySelector(".btn-ai");
+    btn.disabled = true;
+    btn.textContent = "AI 辨識中…（雲端喚醒可能要 1 分鐘）";
+    try {
+      const res = await fetch(AI_API, {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ text: desc, base64Image: photoDataUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      // sub_tag 與 colors 攤平成一串（跟隊友頁面的 selectedTags same做法）
+      const tags = [];
+      for (const it of (data.items || [])) {
+        if (it.sub_tag) tags.push(it.sub_tag);
+        for (const c of (it.colors || [])) tags.push(c);
+      }
+      if (!tags.length) throw new Error("AI 沒認出東西，換張清楚一點的照片或改用打字描述");
+      aiTags = [...new Set(tags)];
+      renderTags();
+      statusEl.textContent = `AI 認出：${aiTags.join("、")} —— 按「比對」開始找。`;
+    } catch (err) {
+      statusEl.textContent = "AI 辨識失敗：" + err.message;
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "開始 AI 辨識產生標籤";
+    }
+  }
 
   // ---- 載入分類下拉 ----
   async function loadCategories(){
@@ -176,14 +277,21 @@
   // ---- 送出比對 ----
   async function doSearch(){
     const body = {
-      category_id: parseInt(document.getElementById("f-category").value, 10),
       lost_date: document.getElementById("f-date").value,
-      color: document.getElementById("f-color").value ? [document.getElementById("f-color").value] : [],
       city: document.getElementById("f-city").value.trim() || null,
       district: document.getElementById("f-district").value.trim() || null,
       limit: 50
     };
-    if (!body.category_id || !body.lost_date){ statusEl.textContent = "請選分類與遺失日期"; return; }
+    // 有 AI 標籤就送 tags（後端會自己正規化成分類 + 顏色）；沒有才用手動選的下拉。
+    if (aiTags.length) {
+      body.tags = aiTags;
+    } else {
+      body.category_id = parseInt(document.getElementById("f-category").value, 10);
+      const c = document.getElementById("f-color").value;
+      if (c) body.color = [c];
+    }
+    if (!body.lost_date){ statusEl.textContent = "請選遺失日期"; return; }
+    if (!body.tags && !body.category_id){ statusEl.textContent = "請選分類，或用上面的 AI 辨識產生標籤"; return; }
     const btn = document.querySelector(".btn");
     btn.disabled = true;                       // 防連點：一次比對就是一次 Firestore 配額
     statusEl.textContent = "比對中…";
@@ -194,6 +302,9 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
       lastResults = data.results;
+      // resolved 回報後端把標籤解讀成什麼分類。走 AI 那條路時使用者看不到正規化過程，
+      // 結果不如預期時得看得出來是「分類判錯」還是「真的沒有這種失物」。
+      lastResolved = (aiTags.length && data.resolved) ? data.resolved : null;
       curSrc = 'all';
       document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', i===0));
       render();
@@ -219,7 +330,10 @@
   function render(){
     const list = document.getElementById("card-list");
     const rows = lastResults.filter(r => curSrc === 'all' || r.item.source === curSrc);
-    statusEl.textContent =
+    const via = lastResolved
+      ? `AI 判為「${lastResolved.category_name}」${lastResolved.color?.length ? '、' + lastResolved.color.join('') + '色' : ''} ｜ `
+      : "";
+    statusEl.textContent = via +
       `共 ${lastResults.length} 筆候選` + (curSrc==='all' ? "" : `，${SRC_NAME[curSrc]} ${rows.length} 筆`);
     list.innerHTML = "";
     rows.forEach((r, idx) => {
