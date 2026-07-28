@@ -27,6 +27,14 @@
   }
   .btn:active { opacity:.85; }
 
+  /* 比對模式切換（智慧比對 / 手動）*/
+  .mode-switch { display:flex; margin:6px 16px 14px; background:#EDE4D3;
+    border-radius:24px; padding:4px; }
+  .mode { flex:1; border:none; background:none; padding:9px 0; border-radius:20px;
+    font-size:14px; font-weight:bold; color:#8A7A66; cursor:pointer; font-family:inherit; }
+  .mode.active { background:white; color:#4A3728; box-shadow:0 1px 3px rgba(74,55,40,.12); }
+  .mode:active { opacity:.85; }
+
   /* AI 辨識區 */
   .ai-box { margin:0 16px 12px; background:#EDE4D3; border-radius:14px; padding:12px 14px; }
   .ai-title { font-size:13px; font-weight:bold; margin-bottom:8px; }
@@ -190,9 +198,14 @@
     <div class="header"><span class="back" onclick="history.back()">‹</span><h1>失物比對</h1>
       <span class="mine-link" onclick="openMyPosts()">我的協尋</span></div>
 
-    <!-- AI 辨識：上傳照片或打字 → 產標籤 → 標籤直接拿去比對。
-         不想用 AI 的話可以完全略過這一區，改用下面的分類下拉手動選。 -->
-    <div class="ai-box">
+    <!-- 比對模式切換：智慧比對（AI 產標籤）／手動（自己選分類）-->
+    <div class="mode-switch">
+      <button class="mode active" data-mode="smart">智慧比對</button>
+      <button class="mode" data-mode="manual">手動</button>
+    </div>
+
+    <!-- 智慧比對：上傳照片或打字 → 產標籤 → 標籤直接拿去比對 -->
+    <div class="ai-box" id="smart-pane">
       <div class="ai-title">🤖 AI 辨識產生標籤<span class="ai-opt">（選用）</span></div>
       <div class="ai-row">
         <label class="ai-file">
@@ -206,22 +219,29 @@
       <div class="ai-tags" id="f-tags"></div>
     </div>
 
-    <div class="search">
+    <!-- 手動：自己選物品分類與顏色 -->
+    <div class="search" id="manual-pane" style="display:none">
       <div>
         <label>物品分類<span id="cat-note"></span></label>
         <select id="f-category"></select>
       </div>
-      <div class="row">
-        <div class="col"><label>遺失日期</label><input type="date" id="f-date">
-          <div style="font-size:10px;color:#8A7A66;margin-top:3px;">失物登錄約有 2-3 天延遲</div>
-        </div>
-        <div class="col"><label>顏色（選填）</label><select id="f-color"></select></div>
+      <div>
+        <label>顏色（選填）</label>
+        <select id="f-color"></select>
+      </div>
+    </div>
+
+    <!-- 兩種模式共用：遺失日期與地點 -->
+    <div class="search">
+      <div>
+        <label>遺失日期</label><input type="date" id="f-date">
+        <div style="font-size:10px;color:#8A7A66;margin-top:3px;">失物登錄約有 2-3 天延遲</div>
       </div>
       <div class="row">
         <div class="col"><label>縣市（選填）</label><input type="text" id="f-city" placeholder="如 台北市"></div>
         <div class="col"><label>行政區（選填）</label><input type="text" id="f-district" placeholder="如 士林區"></div>
       </div>
-      <button class="btn" onclick="doSearch()">比對</button>
+      <button class="btn" id="search-btn" onclick="doSearch()">比對</button>
     </div>
 
     <div class="tab-bar" id="tab-bar">
@@ -340,6 +360,18 @@
   let curSrc = 'all';
   const statusEl = document.getElementById("status");
 
+  // ---- 比對模式：'smart' = AI 標籤比對；'manual' = 手動選分類 ----
+  let mode = 'smart';
+  function setMode(m){
+    mode = m;
+    document.querySelectorAll('.mode').forEach(b => b.classList.toggle('active', b.dataset.mode === m));
+    document.getElementById('smart-pane').style.display  = m === 'smart'  ? 'block' : 'none';
+    document.getElementById('manual-pane').style.display = m === 'manual' ? 'block' : 'none';
+  }
+  document.querySelector('.mode-switch').addEventListener('click', e => {
+    const b = e.target.closest('.mode'); if (b) setMode(b.dataset.mode);
+  });
+
   // ---- 顏色依分數給底色 ----
   function scoreColor(s){ if(s>=0.75) return '#3E7C4F'; if(s>=0.5) return '#B8860B'; return '#9A6A4A'; }
 
@@ -365,9 +397,6 @@
     const box = document.getElementById("f-tags");
     box.innerHTML = aiTags.map((t, i) =>
       `<span class="ai-tag">${t}<span class="x" onclick="removeTag(${i})">×</span></span>`).join("");
-    // 標籤存在時，分類下拉就不會被用到（比對改送 tags），講清楚免得使用者以為下拉沒作用。
-    document.getElementById("cat-note").textContent =
-      aiTags.length ? "（已改用 AI 標籤，清空標籤才會用這個）" : "";
   }
   function removeTag(i){ aiTags.splice(i, 1); renderTags(); }
 
@@ -430,8 +459,8 @@
       district: document.getElementById("f-district").value.trim() || null,
       limit: 50
     };
-    // 有 AI 標籤就送 tags（後端會自己正規化成分類 + 顏色）；沒有才用手動選的下拉。
-    if (aiTags.length) {
+    // 智慧比對送 AI 標籤（後端正規化成分類＋顏色）；手動送分類下拉＋顏色。
+    if (mode === 'smart') {
       body.tags = aiTags;
     } else {
       body.category_id = parseInt(document.getElementById("f-category").value, 10);
@@ -439,8 +468,13 @@
       if (c) body.color = [c];
     }
     if (!body.lost_date){ statusEl.textContent = "請選遺失日期"; return; }
-    if (!body.tags && !body.category_id){ statusEl.textContent = "請選分類，或用上面的 AI 辨識產生標籤"; return; }
-    const btn = document.querySelector(".btn");
+    if (mode === 'smart' && !aiTags.length){
+      statusEl.textContent = "請先用 AI 辨識產生標籤，或切到「手動」選分類"; return;
+    }
+    if (mode === 'manual' && !body.category_id){
+      statusEl.textContent = "請選物品分類"; return;
+    }
+    const btn = document.getElementById("search-btn");
     btn.disabled = true;                       // 防連點：一次比對就是一次 Firestore 配額
     statusEl.textContent = "比對中…";
     try {
@@ -452,7 +486,7 @@
       lastResults = data.results;
       // resolved 回報後端把標籤解讀成什麼分類。走 AI 那條路時使用者看不到正規化過程，
       // 結果不如預期時得看得出來是「分類判錯」還是「真的沒有這種失物」。
-      lastResolved = (aiTags.length && data.resolved) ? data.resolved : null;
+      lastResolved = (mode === 'smart' && data.resolved) ? data.resolved : null;
       curSrc = 'all';
       document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active', i===0));
       render();
