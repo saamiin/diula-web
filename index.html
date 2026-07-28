@@ -88,13 +88,107 @@
   .bd-row .v { width:34px; text-align:right; }
   .npa-btn { display:block; text-align:center; background:#D6E0EB; color:#4A3728;
     padding:14px; border-radius:14px; text-decoration:none; font-size:14px; font-weight:bold; }
+
+  /* ===== 協尋發文流程（都沒有我的東西 → 官方帳號代發）===== */
+  /* 浮動鈕：body 置中限寬 390，用等寬的透明外框把鈕釘在該欄右下角 */
+  .fab-wrap { position:fixed; left:50%; transform:translateX(-50%); width:100%; max-width:390px;
+    height:0; bottom:24px; pointer-events:none; z-index:50; }
+  .fab { pointer-events:auto; position:absolute; right:16px; bottom:0;
+    width:78px; height:78px; border-radius:50%; border:none; cursor:pointer;
+    background:#CBD8C6; color:#3E5240; font-size:12px; line-height:1.3; font-weight:bold;
+    box-shadow:0 6px 18px rgba(74,55,40,.22); font-family:inherit; }
+  .fab:active { opacity:.85; }
+
+  /* 彈窗 */
+  .overlay { position:fixed; inset:0; background:rgba(46,35,25,.42); z-index:60;
+    display:flex; align-items:center; justify-content:center; padding:24px; }
+  .modal { background:#F5F0E8; border-radius:20px; padding:24px 20px; width:100%; max-width:340px;
+    position:relative; box-shadow:0 12px 40px rgba(46,35,25,.25); }
+  .modal .close { position:absolute; top:12px; left:16px; background:none; border:none;
+    font-size:20px; color:#4A3728; cursor:pointer; }
+  .modal h3 { text-align:center; font-size:18px; margin:6px 0 16px; color:#4A3728; }
+  .modal p { text-align:center; font-size:13px; color:#6B5744; line-height:1.6; margin:0 0 16px; }
+  .m-btn { display:block; width:100%; border:none; border-radius:14px; padding:14px; font-size:14px;
+    font-weight:bold; cursor:pointer; margin-top:10px; font-family:inherit; }
+  .m-btn.primary { background:#C9CFEC; color:#3C4180; }
+  .m-btn.ghost { background:white; color:#4A3728; border:1px solid #D8CCBE; }
+  .m-btn:active { opacity:.85; }
+  .m-row { display:flex; gap:10px; }
+  .m-row .m-btn { flex:1; margin-top:0; }
+  .spinner { width:30px; height:30px; border:3px solid #E3D9CB; border-top-color:#4A3728;
+    border-radius:50%; margin:4px auto 14px; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* 協尋表單頁（跟詳細頁一樣，蓋在最上層）*/
+  .post-page { position:fixed; top:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:390px; height:100%; background:#F5F0E8; overflow-y:auto; display:none; z-index:55; }
+  .post-body { padding:8px 20px 40px; }
+  .post-lead { font-size:12px; color:#6B5744; line-height:1.6; margin-bottom:14px;
+    background:#EDE4D3; padding:10px 12px; border-radius:12px; }
+  .fg { margin-bottom:14px; }
+  .fg > label { font-size:13px; font-weight:bold; color:#4A3728; display:block; margin-bottom:6px; }
+  .fg .req { color:#B05C4B; }
+  .fg input, .fg textarea { width:100%; border:1px solid #D8CCBE; border-radius:10px;
+    padding:10px 12px; font-size:13px; background:white; color:#4A3728; font-family:inherit; resize:none; }
+  .fg .note { font-size:10.5px; color:#8A7A66; margin-top:5px; line-height:1.5; }
+  .photo-row { display:flex; gap:10px; align-items:center; }
+  .photo-thumb { width:54px; height:54px; border-radius:11px; flex-shrink:0;
+    background:#D6E0EB; display:flex; align-items:center; justify-content:center; font-size:22px; overflow:hidden; }
+  .photo-thumb img { width:100%; height:100%; object-fit:cover; }
+  /* 即時預覽 */
+  .preview-cap { font-size:11px; color:#8A7A66; margin:2px 0 7px; }
+  .tpost { border:1px solid #E3D9CB; border-radius:14px; padding:13px; background:white; margin-bottom:16px; }
+  .tpost-head { display:flex; align-items:center; gap:9px; margin-bottom:10px; }
+  .tpost-logo { width:30px; height:30px; border-radius:50%; background:#4A3728; color:#F5F0E8;
+    display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; }
+  .tpost-head b { font-size:13px; color:#4A3728; }
+  .tpost-head span { display:block; font-size:11px; color:#8A7A66; }
+  .tpost-body { font-size:12.5px; line-height:1.7; color:#4A3728; white-space:pre-wrap;
+    word-break:break-word; margin:0 0 10px; font-family:inherit; }
+  .tpost-img { height:120px; border-radius:10px; background:#D6E0EB; display:flex;
+    align-items:center; justify-content:center; font-size:34px; overflow:hidden; }
+  .tpost-img img { width:100%; height:100%; object-fit:cover; }
+  /* 授權同意 */
+  .consent { display:flex; gap:9px; align-items:flex-start; padding:12px; border-radius:12px;
+    background:#EDE7F3; margin-bottom:4px; cursor:pointer; }
+  .consent input { margin-top:2px; width:16px; height:16px; accent-color:#6E5AA6; flex-shrink:0; }
+  .consent span { font-size:11.5px; color:#5A4A80; line-height:1.55; }
+  .submit-btn { width:100%; border:none; border-radius:14px; padding:14px; font-size:14px; font-weight:bold;
+    cursor:pointer; margin-top:12px; background:#C9CFEC; color:#3C4180; font-family:inherit; }
+  .submit-btn:disabled { opacity:.5; cursor:default; }
+
+  /* 我的協尋入口（列表頁 header 右側）*/
+  .mine-link { margin-left:auto; font-size:13px; color:#4A3728; font-weight:bold;
+    background:white; border:1px solid #D8CCBE; border-radius:20px; padding:6px 12px; cursor:pointer; }
+  .mine-link:active { opacity:.8; }
+  /* 我的協尋頁 */
+  .my-page { position:fixed; top:0; left:50%; transform:translateX(-50%);
+    width:100%; max-width:390px; height:100%; background:#F5F0E8; overflow-y:auto; display:none; z-index:55; }
+  .my-body { padding:8px 16px 40px; display:flex; flex-direction:column; gap:12px; }
+  .my-card { background:white; border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:9px; }
+  .my-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .badge { font-size:12px; font-weight:bold; padding:4px 11px; border-radius:20px; white-space:nowrap; }
+  .my-name { font-size:15px; font-weight:bold; color:#4A3728; }
+  .my-sub { font-size:12px; color:#6B5744; line-height:1.5; }
+  .my-threads { display:flex; align-items:center; gap:8px; font-size:12px; padding:9px 11px;
+    background:#F5F0E8; border-radius:10px; }
+  .my-threads .tlogo { width:22px; height:22px; border-radius:50%; background:#4A3728; color:#F5F0E8;
+    display:flex; align-items:center; justify-content:center; font-weight:bold; flex-shrink:0; font-size:12px; }
+  .my-threads a { color:#4A6DA8; text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+  .my-threads .muted { color:#8A7A66; flex:1; }
+  .found-btn { width:100%; border:1px solid #3E7C4F; background:white; color:#3E7C4F; border-radius:12px;
+    padding:11px; font-size:13px; font-weight:bold; cursor:pointer; font-family:inherit; }
+  .found-btn:active { opacity:.8; }
+  .my-hint { font-size:11px; color:#8A7A66; text-align:center; line-height:1.5; }
+  .my-empty { text-align:center; color:#8A7A66; font-size:13px; padding:48px 20px; line-height:1.8; }
   </style>
 </head>
 <body>
 
   <!-- 列表頁 -->
   <div id="list-page">
-    <div class="header"><span class="back" onclick="history.back()">‹</span><h1>失物比對</h1></div>
+    <div class="header"><span class="back" onclick="history.back()">‹</span><h1>失物比對</h1>
+      <span class="mine-link" onclick="openMyPosts()">我的協尋</span></div>
 
     <!-- AI 辨識：上傳照片或打字 → 產標籤 → 標籤直接拿去比對。
          不想用 AI 的話可以完全略過這一區，改用下面的分類下拉手動選。 -->
@@ -166,6 +260,60 @@
         前往警政署拾得遺失物系統
       </a>
     </div>
+  </div>
+
+  <!-- 浮動鈕：都沒有我的東西（只在列表頁顯示；開詳細/表單時隱藏）-->
+  <div class="fab-wrap" id="fab-wrap">
+    <button class="fab" onclick="openNoneModal()">都沒有<br>我的物品</button>
+  </div>
+
+  <!-- 彈窗容器（modal / 送出中 / 成功 都塞這裡）-->
+  <div id="overlay-host"></div>
+
+  <!-- 協尋表單頁 -->
+  <div class="post-page" id="post-page">
+    <div class="header"><span class="back" onclick="closePostForm()">‹</span><h1>發協尋文</h1></div>
+    <div class="post-body">
+      <div class="post-lead">照欄位填，系統會套用<b>統一模版</b>由 <b>DiuLa 官方帳號</b> 發佈到 Threads 協尋，你的個人帳號不會露出。</div>
+
+      <div class="fg"><label>物品名稱 <span class="req">*</span></label>
+        <input id="p-name" placeholder="如：黃色杯帶"></div>
+      <div class="fg"><label>遺失日期 <span class="req">*</span></label>
+        <input type="date" id="p-date"></div>
+      <div class="fg"><label>遺失地點 <span class="req">*</span></label>
+        <input id="p-loc" placeholder="如：新北市永和區 世新山洞口"></div>
+      <div class="fg"><label>協尋照片</label>
+        <div class="photo-row">
+          <label class="photo-thumb" id="p-thumb" style="cursor:pointer">📷
+            <input type="file" accept="image/*" id="p-photo" onchange="onPostPhoto(event)" hidden>
+          </label>
+          <div class="note" style="margin-top:0">點左邊換照片。系統會存到公開圖床供 Threads 讀取。</div>
+        </div>
+      </div>
+      <div class="fg"><label>備註</label>
+        <textarea id="p-note" rows="2" placeholder="如：對我很有紀念意義，撿到麻煩私訊 🙏"></textarea></div>
+
+      <div class="preview-cap">📤 官方帳號實際會發出這篇（即時預覽）</div>
+      <div class="tpost">
+        <div class="tpost-head"><div class="tpost-logo">@</div>
+          <div><b>DiuLa 協尋</b><span>diula_official</span></div></div>
+        <pre class="tpost-body" id="p-preview"></pre>
+        <div class="tpost-img" id="p-preview-img">🥤</div>
+      </div>
+
+      <label class="consent">
+        <input type="checkbox" id="p-consent">
+        <span>我同意授權「DiuLa 官方帳號」依上方模版代為發佈，並瞭解找到後可隨時要求刪除。</span>
+      </label>
+      <button class="submit-btn" id="p-submit" disabled onclick="submitPost()">送出，交給官方帳號發文</button>
+      <div class="note" style="text-align:center;margin-top:8px">勾選同意後才能送出。</div>
+    </div>
+  </div>
+
+  <!-- 我的協尋（發過的協尋文 + 找到了刪除）-->
+  <div class="my-page" id="my-page">
+    <div class="header"><span class="back" onclick="closeMyPosts()">‹</span><h1>我的協尋</h1></div>
+    <div class="my-body" id="my-body"></div>
   </div>
 
 <script>
@@ -382,8 +530,9 @@
     }).join("");
 
     document.getElementById("detail-page").style.display = "block";
+    showFab(false);
   }
-  function closeDetail(){ document.getElementById("detail-page").style.display = "none"; }
+  function closeDetail(){ document.getElementById("detail-page").style.display = "none"; showFab(true); }
 
   // ---- 來源 tab ----
   document.getElementById("tab-bar").addEventListener("click", e => {
@@ -391,6 +540,225 @@
     document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
     t.classList.add("active"); curSrc = t.dataset.src; render();
   });
+
+  // ================= 協尋發文流程（都沒有我的東西 → 官方帳號代發）=================
+  // ⚠️ 目前「送出」是前端 stub：只做審核前置與存本地，之後把 submitPost() 裡的
+  //    TODO 換成打後端發文 endpoint 即可（後端走官方 API / 機器人皆可，前端不變）。
+  const host = document.getElementById("overlay-host");
+  let postPhotoDataUrl = null;   // 表單裡的協尋照片（預設沿用 AI 區上傳的那張）
+
+  function showFab(on){ document.getElementById("fab-wrap").style.display = on ? "block" : "none"; }
+  function closeOverlay(){ host.innerHTML = ""; }
+
+  // 第一關：都沒有我的東西
+  function openNoneModal(){
+    host.innerHTML = `
+      <div class="overlay" id="ov">
+        <div class="modal">
+          <button class="close" onclick="closeOverlay()">✕</button>
+          <h3>都沒有我的東西！</h3>
+          <button class="m-btn ghost" onclick="closeOverlay()">開啟自動尋找並推播</button>
+          <button class="m-btn primary" onclick="openPostForm()">幫你發 Threads 的協尋文</button>
+          <button class="m-btn ghost" onclick="closeOverlay()">返回首頁</button>
+        </div>
+      </div>`;
+    // 點灰底空白處關閉
+    document.getElementById("ov").addEventListener("click", e => { if (e.target.id === "ov") closeOverlay(); });
+  }
+
+  // 第二關：協尋表單。自動帶入使用者剛才在比對頁填的內容，不用重打。
+  function openPostForm(){
+    closeOverlay();
+    showFab(false);
+    // 物品名稱：優先用 AI 標籤，其次用打字描述
+    const nameGuess = (aiTags && aiTags.length) ? aiTags[0]
+                    : (document.getElementById("f-desc").value.trim() || "");
+    const loc = [document.getElementById("f-city").value.trim(),
+                 document.getElementById("f-district").value.trim()].filter(Boolean).join(" ");
+    document.getElementById("p-name").value = nameGuess;
+    document.getElementById("p-date").value = document.getElementById("f-date").value || "";
+    document.getElementById("p-loc").value  = loc;
+    document.getElementById("p-note").value = "";
+    document.getElementById("p-consent").checked = false;
+    document.getElementById("p-submit").disabled = true;
+    // 照片沿用 AI 區那張
+    postPhotoDataUrl = photoDataUrl || null;
+    paintPhoto();
+    // 綁即時預覽
+    ["p-name","p-date","p-loc","p-note"].forEach(id =>
+      document.getElementById(id).oninput = refreshPreview);
+    document.getElementById("p-consent").onchange = e =>
+      document.getElementById("p-submit").disabled = !e.target.checked;
+    refreshPreview();
+    document.getElementById("post-page").style.display = "block";
+    document.getElementById("post-page").scrollTop = 0;
+  }
+  function closePostForm(){
+    document.getElementById("post-page").style.display = "none";
+    showFab(true);
+  }
+
+  function onPostPhoto(e){
+    const file = e.target.files[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => { postPhotoDataUrl = ev.target.result; paintPhoto(); };
+    reader.readAsDataURL(file);
+  }
+  function paintPhoto(){
+    const thumb = document.getElementById("p-thumb");
+    const big = document.getElementById("p-preview-img");
+    if (postPhotoDataUrl){
+      // 保留 file input，只換掉旁邊的預覽圖
+      thumb.querySelector("img")?.remove();
+      const im = document.createElement("img"); im.src = postPhotoDataUrl; thumb.prepend(im);
+      big.innerHTML = `<img src="${postPhotoDataUrl}" alt="">`;
+    } else {
+      big.textContent = "🥤";
+    }
+  }
+
+  // 固定模版：使用者填欄位 → 系統套版發出
+  function buildTemplate(){
+    const name = (document.getElementById("p-name").value || "（未填物品）").trim();
+    const date = (document.getElementById("p-date").value || "").replace(/-/g, "/");
+    const loc  = (document.getElementById("p-loc").value || "（未填地點）").trim();
+    const note = (document.getElementById("p-note").value || "").trim();
+    let t = `🔍【協尋】${name}\n\n`
+          + `📅 遺失日期：${date || "（未填）"}\n`
+          + `📍 遺失地點：${loc}\n`;
+    if (note) t += `📝 備註：${note}\n`;
+    t += `\n有看到或撿到的朋友，請透過 DiuLa App 私訊通報，感謝你的幫忙 🙏\n`
+       + `#協尋 #遺失物 #DiuLa`;
+    return t;
+  }
+  function refreshPreview(){ document.getElementById("p-preview").textContent = buildTemplate(); }
+
+  // 送出：目前是 stub（模擬審核→發佈），把協尋單存本地，成功後回列表頁
+  function submitPost(){
+    const name = document.getElementById("p-name").value.trim();
+    const date = document.getElementById("p-date").value;
+    const loc  = document.getElementById("p-loc").value.trim();
+    if (!name || !date || !loc){
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <h3>還有必填沒填</h3><p>物品名稱、遺失日期、遺失地點都要填喔。</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+      return;
+    }
+    // 處理中
+    host.innerHTML = `<div class="overlay"><div class="modal">
+      <div class="spinner"></div><h3 style="margin-bottom:8px">協尋文處理中…</h3>
+      <p>正在審核內容並排程由官方帳號發佈。</p></div></div>`;
+
+    // TODO(後端)：改成 fetch(API + "/threads/submit", {method:"POST", body: payload})
+    //   payload = { name, date, loc, note, image: postPhotoDataUrl, text: buildTemplate() }
+    //   後端審核 → 排入發文佇列 → 回 { submission_id }；發文成功再回寫 thread_post_id。
+    // stub 先當作「已發佈」，好讓「我的協尋」能示範 Threads 連結與刪文。
+    // 接後端後，status 應由伺服器回報（pending_review→published→deleting→deleted），
+    // thread_permalink 也改成後端發文成功後真正回傳的網址。
+    const id = "sos_" + Date.now();
+    const payload = {
+      id, name, lost_date: date, location: loc,
+      note: document.getElementById("p-note").value.trim(),
+      image: postPhotoDataUrl, text: buildTemplate(),
+      created_at: new Date().toISOString(),
+      status: "published",
+      thread_permalink: "https://www.threads.net/@diula_official/post/" + id,
+      published_at: new Date().toISOString(),
+    };
+    try {
+      const arr = loadPosts();
+      arr.push(payload); savePosts(arr);
+    } catch (_) {}
+
+    // 模擬後端處理時間 → 成功畫面
+    setTimeout(() => {
+      document.getElementById("post-page").style.display = "none";
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px">✅</div>
+        <h3 style="margin-bottom:8px">已送出協尋文</h3>
+        <p>審核通過後，會由 <b>DiuLa 官方帳號</b> 發佈到 Threads。<br>
+           找到東西後可在「我的協尋」要求下架。</p>
+        <button class="m-btn primary" onclick="closeOverlay(); openMyPosts();">查看我的協尋</button>
+        <button class="m-btn ghost" onclick="closeOverlay(); showFab(true);">完成</button></div></div>`;
+    }, 1600);
+  }
+
+  // ================= 我的協尋（列表 + 找到了刪除）=================
+  const POSTS_KEY = "diula_sos_posts";
+  function loadPosts(){ try { return JSON.parse(localStorage.getItem(POSTS_KEY) || "[]"); } catch(_) { return []; } }
+  function savePosts(arr){ localStorage.setItem(POSTS_KEY, JSON.stringify(arr)); }
+
+  // 狀態 → [文字, 底色, 字色]
+  function badgeFor(s){
+    return ({
+      pending_review: ["審核中", "#EDE4D3", "#8A7A66"],
+      published:      ["自動推播中", "#F5E7CF", "#B7935A"],
+      deleting:       ["已排定刪除", "#E7E0F0", "#6E5AA6"],
+      deleted:        ["已找到 · 已下架", "#DDE7DC", "#3E7C4F"],
+    })[s] || ["—", "#eee", "#888"];
+  }
+  function fmtDate(iso){ return (iso || "").replace(/-/g, "/"); }
+
+  function openMyPosts(){ closeOverlay(); showFab(false); renderMyPosts();
+    document.getElementById("my-page").style.display = "block";
+    document.getElementById("my-page").scrollTop = 0; }
+  function closeMyPosts(){ document.getElementById("my-page").style.display = "none"; showFab(true); }
+
+  function renderMyPosts(){
+    const body = document.getElementById("my-body");
+    const posts = loadPosts().slice().reverse();   // 新的在上
+    if (!posts.length){
+      body.innerHTML = `<div class="my-empty">還沒有協尋紀錄。<br>找不到東西時，從右下角「都沒有我的物品」發一篇吧。</div>`;
+      return;
+    }
+    body.innerHTML = posts.map(pst => {
+      const [txt, bg, fg] = badgeFor(pst.status);
+      const live = pst.status === "published";
+      const gone = pst.status === "deleting" || pst.status === "deleted";
+      const threads = live
+        ? `<a href="${pst.thread_permalink}" target="_blank">${pst.thread_permalink.replace("https://www.","")}</a>`
+        : `<span class="muted">${gone ? "貼文已排定由官方帳號下架" : "尚未發佈"}</span>`;
+      const action = live
+        ? `<button class="found-btn" onclick="foundItem('${pst.id}')">✓ 我找到了！刪除此筆紀錄</button>`
+        : (gone ? `<div class="my-hint">官方帳號會在額度允許時撤下貼文，最長約 24 小時。</div>` : "");
+      return `<div class="my-card">
+        <div class="my-top">
+          <span class="my-name">${escapeHtml(pst.name)}</span>
+          <span class="badge" style="background:${bg};color:${fg}">${txt}</span>
+        </div>
+        <div class="my-sub">📅 ${fmtDate(pst.lost_date)}　📍 ${escapeHtml(pst.location)}</div>
+        <div class="my-threads"><span class="tlogo">@</span>${threads}</div>
+        ${action}
+      </div>`;
+    }).join("");
+  }
+  function escapeHtml(s){ return (s || "").replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
+
+  // 我找到了 → 確認 → 排定刪除
+  function foundItem(id){
+    host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+      <button class="close" onclick="closeOverlay()">✕</button>
+      <h3>是否確認要刪除？</h3>
+      <p>提醒：確認後不會立刻刪除，官方帳號會依序處理下架。</p>
+      <div class="m-row">
+        <button class="m-btn ghost" onclick="closeOverlay()">否</button>
+        <button class="m-btn primary" onclick="scheduleDelete('${id}')">是</button>
+      </div></div></div>`;
+  }
+  function scheduleDelete(id){
+    // TODO(後端)：改成 fetch(API + "/threads/" + id + "/resolve", {method:"POST"})
+    //   後端把該筆標成 resolved → 排入刪文佇列 → worker 呼叫 Threads 刪文。
+    const arr = loadPosts();
+    const p = arr.find(x => x.id === id);
+    if (p){ p.status = "deleting"; p.resolved_at = new Date().toISOString(); savePosts(arr); }
+    renderMyPosts();
+    host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+      <div style="font-size:32px;text-align:center;margin-bottom:6px">🗓️</div>
+      <h3 style="margin-bottom:8px">該篇 Threads 串文已排定刪除</h3>
+      <p>官方帳號會在額度允許時撤下貼文，最長約 24 小時。</p>
+      <button class="m-btn primary" onclick="closeOverlay()">確認</button></div></div>`;
+  }
 
   // ---- 啟動 ----
   // 只載入分類下拉（後端有快取，不燒讀取配額），不自動比對：
