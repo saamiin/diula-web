@@ -668,8 +668,8 @@
   }
   function refreshPreview(){ document.getElementById("p-preview").textContent = buildTemplate(); }
 
-  // 送出：目前是 stub（模擬審核→發佈），把協尋單存本地，成功後回列表頁
-  function submitPost(){
+  // 送出：套模版 → 打後端 /threads/submit（官方帳號真的發文）→ 存本地供「我的協尋」用
+  async function submitPost(){
     const name = document.getElementById("p-name").value.trim();
     const date = document.getElementById("p-date").value;
     const loc  = document.getElementById("p-loc").value.trim();
@@ -679,43 +679,46 @@
         <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
       return;
     }
-    // 處理中
+    // 處理中（有圖時後端要等圖片容器處理，會久一點）
     host.innerHTML = `<div class="overlay"><div class="modal">
-      <div class="spinner"></div><h3 style="margin-bottom:8px">協尋文處理中…</h3>
-      <p>正在審核內容並排程由官方帳號發佈。</p></div></div>`;
+      <div class="spinner"></div><h3 style="margin-bottom:8px">協尋文發佈中…</h3>
+      <p>正在透過 DiuLa 官方帳號發佈到 Threads，稍候。</p></div></div>`;
 
-    // TODO(後端)：改成 fetch(API + "/threads/submit", {method:"POST", body: payload})
-    //   payload = { name, date, loc, note, image: postPhotoDataUrl, text: buildTemplate() }
-    //   後端審核 → 排入發文佇列 → 回 { submission_id }；發文成功再回寫 thread_post_id。
-    // stub 先當作「已發佈」，好讓「我的協尋」能示範 Threads 連結與刪文。
-    // 接後端後，status 應由伺服器回報（pending_review→published→deleting→deleted），
-    // thread_permalink 也改成後端發文成功後真正回傳的網址。
-    const id = "sos_" + Date.now();
-    const payload = {
-      id, name, lost_date: date, location: loc,
-      note: document.getElementById("p-note").value.trim(),
-      image: postPhotoDataUrl, text: buildTemplate(),
-      created_at: new Date().toISOString(),
-      status: "published",
-      thread_permalink: "https://www.threads.net/@diula_official/post/" + id,
-      published_at: new Date().toISOString(),
-    };
+    const note = document.getElementById("p-note").value.trim();
+    const text = buildTemplate();
     try {
-      const arr = loadPosts();
-      arr.push(payload); savePosts(arr);
-    } catch (_) {}
+      const res = await fetch(API + "/threads/submit", {
+        method: "POST", headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ name, lost_date: date, location: loc, note, image: postPhotoDataUrl, text })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
 
-    // 模擬後端處理時間 → 成功畫面
-    setTimeout(() => {
+      // 存本地（給「我的協尋」列表用；thread_post_id 是之後刪文的依據）
+      const arr = loadPosts();
+      arr.push({
+        id: "sos_" + Date.now(), name, lost_date: date, location: loc, note,
+        image: postPhotoDataUrl, text,
+        status: "published",
+        thread_post_id: data.post_id,
+        thread_permalink: data.permalink,
+        created_at: new Date().toISOString(), published_at: new Date().toISOString(),
+      });
+      savePosts(arr);
+
       document.getElementById("post-page").style.display = "none";
       host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
         <div style="font-size:34px;text-align:center;margin-bottom:6px">✅</div>
-        <h3 style="margin-bottom:8px">已送出協尋文</h3>
-        <p>審核通過後，會由 <b>DiuLa 官方帳號</b> 發佈到 Threads。<br>
-           找到東西後可在「我的協尋」要求下架。</p>
+        <h3 style="margin-bottom:8px">協尋文已發佈</h3>
+        <p>已由 <b>DiuLa 官方帳號</b> 發佈到 Threads。<br>找到東西後可在「我的協尋」下架。</p>
         <button class="m-btn primary" onclick="closeOverlay(); openMyPosts();">查看我的協尋</button>
         <button class="m-btn ghost" onclick="closeOverlay(); showFab(true);">完成</button></div></div>`;
-    }, 1600);
+    } catch (err) {
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>發佈失敗</h3><p>${escapeHtml(err.message)}</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好，回去改</button></div></div>`;
+    }
   }
 
   // ================= 我的協尋（列表 + 找到了刪除）=================
@@ -751,11 +754,11 @@
       const live = pst.status === "published";
       const gone = pst.status === "deleting" || pst.status === "deleted";
       const threads = live
-        ? `<a href="${pst.thread_permalink}" target="_blank">${pst.thread_permalink.replace("https://www.","")}</a>`
-        : `<span class="muted">${gone ? "貼文已排定由官方帳號下架" : "尚未發佈"}</span>`;
+        ? `<a href="${pst.thread_permalink}" target="_blank">${(pst.thread_permalink||"").replace("https://www.","")}</a>`
+        : `<span class="muted">${gone ? "貼文已由官方帳號下架" : "尚未發佈"}</span>`;
       const action = live
         ? `<button class="found-btn" onclick="foundItem('${pst.id}')">✓ 我找到了！刪除此筆紀錄</button>`
-        : (gone ? `<div class="my-hint">官方帳號會在額度允許時撤下貼文，最長約 24 小時。</div>` : "");
+        : "";
       return `<div class="my-card">
         <div class="my-top">
           <span class="my-name">${escapeHtml(pst.name)}</span>
@@ -775,24 +778,42 @@
     host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
       <button class="close" onclick="closeOverlay()">✕</button>
       <h3>是否確認要刪除？</h3>
-      <p>提醒：確認後不會立刻刪除，官方帳號會依序處理下架。</p>
+      <p>確認後，官方帳號會把這篇協尋文從 Threads 撤下，此動作無法復原。</p>
       <div class="m-row">
         <button class="m-btn ghost" onclick="closeOverlay()">否</button>
         <button class="m-btn primary" onclick="scheduleDelete('${id}')">是</button>
       </div></div></div>`;
   }
-  function scheduleDelete(id){
-    // TODO(後端)：改成 fetch(API + "/threads/" + id + "/resolve", {method:"POST"})
-    //   後端把該筆標成 resolved → 排入刪文佇列 → worker 呼叫 Threads 刪文。
+  // 找到了 → 打後端 /threads/delete（官方帳號真的刪文）→ 標成已下架
+  async function scheduleDelete(id){
     const arr = loadPosts();
     const p = arr.find(x => x.id === id);
-    if (p){ p.status = "deleting"; p.resolved_at = new Date().toISOString(); savePosts(arr); }
-    renderMyPosts();
-    host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
-      <div style="font-size:32px;text-align:center;margin-bottom:6px">🗓️</div>
-      <h3 style="margin-bottom:8px">該篇 Threads 串文已排定刪除</h3>
-      <p>官方帳號會在額度允許時撤下貼文，最長約 24 小時。</p>
-      <button class="m-btn primary" onclick="closeOverlay()">確認</button></div></div>`;
+    if (!p){ closeOverlay(); return; }
+    host.innerHTML = `<div class="overlay"><div class="modal">
+      <div class="spinner"></div><h3 style="margin-bottom:8px">下架處理中…</h3>
+      <p>正在通知 DiuLa 官方帳號撤下這篇協尋文。</p></div></div>`;
+    try {
+      if (p.thread_post_id){
+        const res = await fetch(API + "/threads/delete", {
+          method: "POST", headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ post_id: p.thread_post_id })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      }
+      p.status = "deleted"; p.resolved_at = new Date().toISOString(); savePosts(arr);
+      renderMyPosts();
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <div style="font-size:32px;text-align:center;margin-bottom:6px">✅</div>
+        <h3 style="margin-bottom:8px">已下架</h3>
+        <p>那篇協尋文已由官方帳號從 Threads 撤下。祝你順利找回東西 🙌</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+    } catch (err) {
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>下架失敗</h3><p>${escapeHtml(err.message)}</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好，稍後再試</button></div></div>`;
+    }
   }
 
   // ---- 啟動 ----
