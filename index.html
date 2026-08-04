@@ -191,7 +191,19 @@
   .found-btn:active { opacity:.8; }
   .my-hint { font-size:11px; color:#8A7A66; text-align:center; line-height:1.5; }
   .my-empty { text-align:center; color:#8A7A66; font-size:13px; padding:48px 20px; line-height:1.8; }
+  /* 訂閱通知的頻道選擇 */
+  .ch-btn { display:flex; align-items:center; gap:10px; width:100%; border:1px solid #D8CCBE;
+    border-radius:14px; padding:13px 14px; background:white; cursor:pointer; margin-top:10px;
+    font-family:inherit; font-size:14px; color:#4A3728; text-align:left; }
+  .ch-btn:active { opacity:.85; }
+  .ch-btn .ic { font-size:20px; }
+  .ch-btn b { display:block; font-size:14px; }
+  .ch-btn small { display:block; font-size:11px; color:#8A7A66; font-weight:normal; margin-top:2px; }
+  .ch-line { border-color:#57B84B; }
+  .sub-email { width:100%; border:1px solid #D8CCBE; border-radius:10px; padding:11px 12px;
+    font-size:14px; background:white; color:#4A3728; font-family:inherit; margin-top:12px; }
   </style>
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
 </head>
 <body>
 
@@ -598,7 +610,7 @@
         <div class="modal">
           <button class="close" onclick="closeOverlay()">✕</button>
           <h3>都沒有我的東西！</h3>
-          <button class="m-btn ghost" onclick="closeOverlay()">開啟自動尋找並推播</button>
+          <button class="m-btn primary" onclick="openSubscribe()">🔔 開啟自動尋找並推播</button>
           <button class="m-btn primary" onclick="openPostForm()">幫你發 Threads 的協尋文</button>
           <button class="m-btn ghost" onclick="closeOverlay()">返回首頁</button>
         </div>
@@ -754,11 +766,12 @@
   function renderMyPosts(){
     const body = document.getElementById("my-body");
     const posts = loadPosts().slice().reverse();   // 新的在上
-    if (!posts.length){
-      body.innerHTML = `<div class="my-empty">還沒有協尋紀錄。<br>找不到東西時，從右下角「都沒有我的物品」發一篇吧。</div>`;
+    const subsHtml = renderSubs();
+    if (!posts.length && !subsHtml){
+      body.innerHTML = `<div class="my-empty">還沒有協尋紀錄。<br>找不到東西時，從右下角「都沒有我的物品」開啟自動尋找或發一篇協尋文吧。</div>`;
       return;
     }
-    body.innerHTML = posts.map(pst => {
+    const postsHtml = posts.map(pst => {
       const [txt, bg, fg] = badgeFor(pst.status);
       const live = pst.status === "published";
       const gone = pst.status === "deleting" || pst.status === "deleted";
@@ -778,6 +791,7 @@
         ${action}
       </div>`;
     }).join("");
+    body.innerHTML = subsHtml + postsHtml;
   }
   function escapeHtml(s){ return (s || "").replace(/[&<>"']/g, c =>
     ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c])); }
@@ -825,6 +839,208 @@
     }
   }
 
+  // ================= 自動比對推播（訂閱：LINE / Email 雙通道）=================
+  // 協尋沒找到 → 訂閱條件 → 後端每天新資料進庫後重跑比對，命中就推 LINE 或寄 email。
+  // LINE 走 LIFF 拿 userId（跟登入 App 的方式無關）；Google 登入沒 LINE 的人改用 email。
+  const LIFF_ID = "2009840543-oj99U5pA";
+  const LINE_BASIC_ID = "@937mjrfd";                                   // DiuLa 官方帳號
+  const ADD_FRIEND_URL = "https://line.me/R/ti/p/" + LINE_BASIC_ID;    // 加好友（沒加好友收不到 push）
+  const SUBS_KEY = "diula_subs";
+  const PENDING_SUB_KEY = "diula_pending_sub";                         // LIFF 登入會離開頁面，先存這裡回來續辦
+
+  let liffReady = false;
+  let pendingCriteria = null, pendingSeen = [];
+
+  async function initLiff(){
+    if (liffReady) return;
+    if (typeof liff === "undefined") throw new Error("LIFF SDK 未載入");
+    await liff.init({ liffId: LIFF_ID });
+    liffReady = true;
+  }
+
+  // 把目前表單/上次比對的條件收成後端要的 criteria（matcher 需要 category_id + lost_date）
+  function buildCriteria(){
+    const lost_date = document.getElementById("f-date").value;
+    const city     = document.getElementById("f-city").value.trim() || null;
+    const district = document.getElementById("f-district").value.trim() || null;
+    const detail   = document.getElementById("f-detail").value.trim() || null;
+    let category_id = null, color = [], free_tags = [];
+    if (mode === "smart"){
+      // 智慧比對的分類要靠後端解讀 → 得先比對過一次才有 lastResolved
+      if (lastResolved && lastResolved.category_id){
+        category_id = lastResolved.category_id;
+        color = lastResolved.color || [];
+      }
+      free_tags = aiTags.slice();
+    } else {
+      category_id = parseInt(document.getElementById("f-category").value, 10) || null;
+      const c = document.getElementById("f-color").value;
+      if (c) color = [c];
+    }
+    return {
+      ok: !!(category_id && lost_date),
+      criteria: { category_id, color, free_tags, lost_date, city, district, detail },
+    };
+  }
+
+  function openSubscribe(){
+    closeOverlay();
+    const { ok, criteria } = buildCriteria();
+    if (!ok){
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>先比對一次</h3>
+        <p>請先填好上面的「分類／描述」和「遺失日期」，按一次「比對」，<br>我才知道要幫你盯什麼。</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+      document.getElementById("ov").addEventListener("click", e => { if (e.target.id==="ov") closeOverlay(); });
+      return;
+    }
+    pendingCriteria = criteria;
+    pendingSeen = (lastResults || []).map(r => r.id);   // 已看過的當基線，之後只推「新出現」的
+    const name = catName[criteria.category_id] || "這件物品";
+    host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+      <button class="close" onclick="closeOverlay()">✕</button>
+      <h3>開啟自動尋找</h3>
+      <p>之後每天有新失物進來，只要比對到「<b>${escapeHtml(name)}</b>」<br>就主動通知你。要用哪個方式收通知？</p>
+      <button class="ch-btn ch-line" onclick="subscribeLine()">
+        <span class="ic">💬</span><span><b>LINE 通知</b><small>用 LINE 登入，命中直接推到你的 LINE</small></span></button>
+      <button class="ch-btn" onclick="subscribeEmail()">
+        <span class="ic">✉️</span><span><b>Email 通知</b><small>沒在用 LINE？留 email 也可以</small></span></button>
+    </div></div>`;
+    document.getElementById("ov").addEventListener("click", e => { if (e.target.id==="ov") closeOverlay(); });
+  }
+
+  // LINE：LIFF 登入拿 userId。登入會離開頁面 → 先把條件存 sessionStorage，回來由 resumePendingSub 續辦。
+  async function subscribeLine(){
+    try {
+      await initLiff();
+    } catch (e){
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>此環境無法用 LINE 登入</h3>
+        <p>可能是在本機或未授權的網域開啟。<br>請改用 Email 通知。</p>
+        <button class="m-btn primary" onclick="subscribeEmail()">改用 Email</button></div></div>`;
+      return;
+    }
+    if (!liff.isLoggedIn()){
+      sessionStorage.setItem(PENDING_SUB_KEY, JSON.stringify({ criteria: pendingCriteria, seen: pendingSeen }));
+      liff.login({ redirectUri: location.href });   // 回來後 initLiff→resumePendingSub 接手
+      return;
+    }
+    const profile = await liff.getProfile();
+    await postSubscription({ channel:"line", line_user_id: profile.userId,
+                             criteria: pendingCriteria, seen_ids: pendingSeen });
+  }
+
+  // 從 LINE 登入導回頁面後：若有待辦訂閱且已登入，補完它
+  async function resumePendingSub(){
+    const raw = sessionStorage.getItem(PENDING_SUB_KEY);
+    if (!raw || !liff.isLoggedIn()) return;
+    sessionStorage.removeItem(PENDING_SUB_KEY);
+    try {
+      const pending = JSON.parse(raw);
+      const profile = await liff.getProfile();
+      await postSubscription({ channel:"line", line_user_id: profile.userId,
+                               criteria: pending.criteria, seen_ids: pending.seen });
+    } catch (_) { /* 使用者取消或逾時，略過 */ }
+  }
+
+  function subscribeEmail(){
+    closeOverlay();
+    host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+      <button class="close" onclick="closeOverlay()">✕</button>
+      <h3>Email 通知</h3>
+      <p>比對到可能是你的失物時，我們寄 email 通知你。</p>
+      <input class="sub-email" id="sub-email" type="email" placeholder="you@example.com" autocomplete="email">
+      <button class="m-btn primary" onclick="submitEmailSub()">開啟通知</button></div></div>`;
+  }
+  function submitEmailSub(){
+    const email = (document.getElementById("sub-email").value || "").trim();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){
+      document.getElementById("sub-email").style.borderColor = "#B05C4B";
+      return;
+    }
+    postSubscription({ channel:"email", email, criteria: pendingCriteria, seen_ids: pendingSeen });
+  }
+
+  async function postSubscription(body){
+    host.innerHTML = `<div class="overlay"><div class="modal">
+      <div class="spinner"></div><h3 style="margin-bottom:8px">訂閱設定中…</h3></div></div>`;
+    try {
+      const res = await fetch(API + "/subscriptions", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      saveSub({ id: data.id, channel: body.channel,
+                target: body.line_user_id || body.email || "",
+                criteria: body.criteria, created_at: new Date().toISOString() });
+      // LINE 通道：一定要加官方帳號好友，否則 push 回 403、後端會把訂閱停掉
+      const friend = body.channel === "line"
+        ? `<a class="m-btn primary" style="text-decoration:none;display:block" href="${ADD_FRIEND_URL}" target="_blank">➕ 加入 DiuLa 官方帳號好友</a>
+           <p style="margin:12px 0 0">⚠️ 沒加好友的話 LINE 收不到通知，請務必加一下。</p>`
+        : `<p style="margin:12px 0 0">之後比對到就會寄到你的信箱。</p>`;
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <div style="font-size:34px;text-align:center;margin-bottom:6px">🔔</div>
+        <h3 style="margin-bottom:8px">已開啟自動尋找</h3>
+        <p>每天有新失物進來就會幫你比對，命中會用${body.channel==="line"?"LINE":"Email"}通知你。</p>
+        ${friend}
+        <button class="m-btn ghost" onclick="closeOverlay(); openMyPosts();">查看我的協尋</button>
+        <button class="m-btn ghost" onclick="closeOverlay(); showFab(true);">完成</button></div></div>`;
+    } catch (err) {
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>訂閱失敗</h3><p>${escapeHtml(err.message)}</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+    }
+  }
+
+  // 訂閱本地存檔（給「我的協尋」列出 + 停止通知用）
+  function loadSubs(){ try { return JSON.parse(localStorage.getItem(SUBS_KEY) || "[]"); } catch(_) { return []; } }
+  function saveSub(s){ const a = loadSubs(); a.push(s); localStorage.setItem(SUBS_KEY, JSON.stringify(a)); }
+  function removeSub(id){ localStorage.setItem(SUBS_KEY, JSON.stringify(loadSubs().filter(s => s.id !== id))); }
+
+  // 停止通知 → 打後端 /subscriptions/found（active=false）→ 移除本地
+  async function stopSub(id){
+    host.innerHTML = `<div class="overlay"><div class="modal">
+      <div class="spinner"></div><h3 style="margin-bottom:8px">停止通知中…</h3></div></div>`;
+    try {
+      const res = await fetch(API + "/subscriptions/found", {
+        method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (!res.ok && res.status !== 404) throw new Error(data.error || ("HTTP " + res.status));
+      removeSub(id); renderMyPosts();
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <h3>已停止通知</h3><p>之後不會再推播這筆協尋。</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+    } catch (err) {
+      host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
+        <button class="close" onclick="closeOverlay()">✕</button>
+        <h3>停止失敗</h3><p>${escapeHtml(err.message)}</p>
+        <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
+    }
+  }
+
+  function renderSubs(){
+    const subs = loadSubs().slice().reverse();
+    if (!subs.length) return "";
+    return subs.map(s => {
+      const c = s.criteria || {};
+      const name = catName[c.category_id] || "協尋";
+      const loc = [c.city, c.district, c.detail].filter(Boolean).join(" ") || "不限地點";
+      const ch = s.channel === "line" ? "LINE 通知" : "Email 通知";
+      return `<div class="my-card">
+        <div class="my-top">
+          <span class="my-name">🔔 ${escapeHtml(name)}</span>
+          <span class="badge" style="background:#F5E7CF;color:#B7935A">通知中</span>
+        </div>
+        <div class="my-sub">📅 ${fmtDate(c.lost_date)}　📍 ${escapeHtml(loc)}　｜ ${ch}</div>
+        <button class="found-btn" onclick="stopSub('${s.id}')">🔕 停止通知</button>
+      </div>`;
+    }).join("");
+  }
+
   // ---- 啟動 ----
   // 只載入分類下拉（後端有快取，不燒讀取配額），不自動比對：
   // 自動比對會讓「每個人打開網頁」「每次重新整理」都燒掉一次 Firestore 額度。
@@ -842,6 +1058,9 @@
     } catch (err) {
       statusEl.textContent = "分類載入失敗：" + err.message + "（伺服器可能還在喚醒，等一下重新整理）";
     }
+    // LIFF 初始化（失敗不影響比對功能，例如在本機或未授權網域；那種情況 LINE 訂閱不可用、email 仍可）。
+    // 從 LINE 登入導回頁面時，這裡順手把待辦的訂閱補完。
+    try { await initLiff(); await resumePendingSub(); } catch (_) {}
   })();
 </script>
 </body>
