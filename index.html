@@ -255,11 +255,6 @@
         <div class="col"><label>縣市（選填）</label><input type="text" id="f-city" placeholder="如 台北市"></div>
         <div class="col"><label>行政區（選填）</label><input type="text" id="f-district" placeholder="如 士林區"></div>
       </div>
-      <div>
-        <label>詳細地點（選填）</label>
-        <input type="text" id="f-detail" placeholder="如 世新大學、台北車站、某某夜市">
-        <div style="font-size:10px;color:#8A7A66;margin-top:3px;">填了會優先比對站名/保管地/說明，也會帶進協尋文</div>
-      </div>
       <button class="btn" id="search-btn" onclick="doSearch()">比對</button>
     </div>
 
@@ -322,6 +317,9 @@
         <input type="date" id="p-date" class="locked" readonly tabindex="-1"></div>
       <div class="fg"><label>遺失地點 <span class="req">*</span></label>
         <input id="p-loc" class="locked" readonly tabindex="-1"></div>
+      <div class="fg"><label>詳細地點（選填）</label>
+        <input id="p-detail" placeholder="如：木柵麥當勞、3 號出口、B1 停車場">
+        <div class="note" style="margin-top:5px">會接在遺失地點後面，一起發到協尋文</div></div>
       <div class="fg"><label>協尋照片</label>
         <div class="photo-row">
           <div class="photo-thumb" id="p-thumb">📷</div>
@@ -475,7 +473,6 @@
       lost_date: document.getElementById("f-date").value,
       city: document.getElementById("f-city").value.trim() || null,
       district: document.getElementById("f-district").value.trim() || null,
-      detail: document.getElementById("f-detail").value.trim() || null,
       limit: 50
     };
     // 智慧比對送 AI 標籤（後端正規化成分類＋顏色）；手動送分類下拉＋顏色。
@@ -627,8 +624,7 @@
     const nameGuess = (aiTags && aiTags.length) ? aiTags[0]
                     : (document.getElementById("f-desc").value.trim() || "");
     const loc = [document.getElementById("f-city").value.trim(),
-                 document.getElementById("f-district").value.trim(),
-                 document.getElementById("f-detail").value.trim()].filter(Boolean).join(" ");
+                 document.getElementById("f-district").value.trim()].filter(Boolean).join(" ");
     document.getElementById("p-name").value = nameGuess;
     document.getElementById("p-date").value = document.getElementById("f-date").value || "";
     // 地點沿用上一頁 → 鎖起來；但上一頁沒填地點的話就解鎖讓使用者自己補，避免卡死
@@ -640,6 +636,7 @@
       locEl.classList.remove("locked"); locEl.removeAttribute("readonly"); locEl.tabIndex = 0;
       locEl.placeholder = "如：新北市永和區 世新山洞口";
     }
+    document.getElementById("p-detail").value = "";
     document.getElementById("p-note").value = "";
     document.getElementById("p-consent").checked = false;
     document.getElementById("p-submit").disabled = true;
@@ -647,7 +644,7 @@
     postPhotoDataUrl = photoDataUrl || null;
     paintPhoto();
     // 綁即時預覽
-    ["p-name","p-date","p-loc","p-note"].forEach(id =>
+    ["p-name","p-date","p-loc","p-detail","p-note"].forEach(id =>
       document.getElementById(id).oninput = refreshPreview);
     document.getElementById("p-consent").onchange = e =>
       document.getElementById("p-submit").disabled = !e.target.checked;
@@ -677,7 +674,9 @@
   function buildTemplate(){
     const name = (document.getElementById("p-name").value || "（未填物品）").trim();
     const date = (document.getElementById("p-date").value || "").replace(/-/g, "/");
-    const loc  = (document.getElementById("p-loc").value || "（未填地點）").trim();
+    const detail = (document.getElementById("p-detail").value || "").trim();
+    const loc  = [(document.getElementById("p-loc").value || "").trim(), detail]
+                   .filter(Boolean).join(" ") || "（未填地點）";
     const note = (document.getElementById("p-note").value || "").trim();
     let t = `🔍【協尋】${name}\n\n`
           + `📅 遺失日期：${date || "（未填）"}\n`
@@ -693,8 +692,10 @@
   async function submitPost(){
     const name = document.getElementById("p-name").value.trim();
     const date = document.getElementById("p-date").value;
-    const loc  = document.getElementById("p-loc").value.trim();
-    if (!name || !date || !loc){
+    const baseLoc = document.getElementById("p-loc").value.trim();
+    const detail  = document.getElementById("p-detail").value.trim();  // 選填
+    const loc = [baseLoc, detail].filter(Boolean).join(" ");
+    if (!name || !date || !baseLoc){
       host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
         <h3>還有必填沒填</h3><p>物品名稱、遺失日期、遺失地點都要填喔。</p>
         <button class="m-btn primary" onclick="closeOverlay()">好</button></div></div>`;
@@ -863,7 +864,6 @@
     const lost_date = document.getElementById("f-date").value;
     const city     = document.getElementById("f-city").value.trim() || null;
     const district = document.getElementById("f-district").value.trim() || null;
-    const detail   = document.getElementById("f-detail").value.trim() || null;
     let category_id = null, color = [], free_tags = [];
     if (mode === "smart"){
       // 智慧比對的分類要靠後端解讀 → 得先比對過一次才有 lastResolved
@@ -879,7 +879,7 @@
     }
     return {
       ok: !!(category_id && lost_date),
-      criteria: { category_id, color, free_tags, lost_date, city, district, detail },
+      criteria: { category_id, color, free_tags, lost_date, city, district },
     };
   }
 
