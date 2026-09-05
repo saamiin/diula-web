@@ -901,7 +901,7 @@
     host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
       <button class="close" onclick="closeOverlay()">✕</button>
       <h3>開啟自動尋找</h3>
-      <p>之後每天有新失物進來，只要比對到「<b>${escapeHtml(name)}</b>」<br>就主動通知你。要用哪個方式收通知？</p>
+      <p>接下來 <b>5 天內</b>，每天有新失物進來只要比對到「<b>${escapeHtml(name)}</b>」<br>就主動通知你。要用哪個方式收通知？</p>
       <button class="ch-btn ch-line" onclick="subscribeLine()">
         <span class="ic">💬</span><span><b>LINE 通知</b><small>用 LINE 登入，命中直接推到你的 LINE</small></span></button>
       <button class="ch-btn" onclick="subscribeEmail()">
@@ -983,7 +983,7 @@
       host.innerHTML = `<div class="overlay" id="ov"><div class="modal">
         <div style="font-size:34px;text-align:center;margin-bottom:6px">🔔</div>
         <h3 style="margin-bottom:8px">已開啟自動尋找</h3>
-        <p>每天有新失物進來就會幫你比對，命中會用${body.channel==="line"?"LINE":"Email"}通知你。</p>
+        <p>接下來 5 天內，每天有新失物進來就會幫你比對，命中會用${body.channel==="line"?"LINE":"Email"}通知你。</p>
         ${friend}
         <button class="m-btn ghost" onclick="closeOverlay(); openMyPosts();">查看我的協尋</button>
         <button class="m-btn ghost" onclick="closeOverlay(); showFab(true);">完成</button></div></div>`;
